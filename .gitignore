@@ -1,0 +1,16 @@
+Dataset/
+uploadimage/
+*.h5
+*.keras
+training_history.png
+best_model.keras
+processed_data/
+model/
+static/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+uploads/

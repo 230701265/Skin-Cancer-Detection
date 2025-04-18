@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skin Disease Detection</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-md-8 offset-md-2">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h2 class="mb-0 text-center">Skin Disease Detection</h2>
+                    </div>
+                    <div class="card-body">
+                        <!-- Model Status -->
+                        <div class="alert alert-info" role="alert">
+                            <strong>Status:</strong> {{ model_status }}
+                        </div>
+
+                        <!-- Upload Form -->
+                        <form id="upload-form" enctype="multipart/form-data">
+                            <div class="mb-3">
+                                <label for="file" class="form-label">Upload Skin Lesion Image</label>
+                                <input type="file" class="form-control" id="file" name="file" accept="image/*" required>
+                                <div class="form-text">Upload a clear image of the skin lesion for diagnosis.</div>
+                            </div>
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary btn-lg">Analyze Image</button>
+                            </div>
+                        </form>
+
+                        <!-- Loading Spinner -->
+                        <div id="loading" class="text-center mt-4 d-none">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Analyzing image...</p>
+                        </div>
+
+                        <!-- Results Section -->
+                        <div id="results" class="mt-4 d-none">
+                            <div class="row">
+                                <!-- Image Preview -->
+                                <div class="col-md-6">
+                                    <div class="card">
+                                        <div class="card-header">Uploaded Image</div>
+                                        <div class="card-body text-center">
+                                            <img id="preview-image" class="img-fluid rounded" alt="Uploaded skin lesion image">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Prediction Results -->
+                                <div class="col-md-6">
+                                    <div class="card">
+                                        <div class="card-header">Prediction Results</div>
+                                        <div class="card-body">
+                                            <h5 class="mb-3">Primary Diagnosis:</h5>
+                                            <div class="alert alert-primary" role="alert">
+                                                <h4 id="prediction-class"></h4>
+                                                <div class="progress mt-2">
+                                                    <div id="prediction-confidence" class="progress-bar progress-bar-striped" role="progressbar"></div>
+                                                </div>
+                                            </div>
+                                            
+                                            <h5 class="mt-4 mb-3">Other Possibilities:</h5>
+                                            <div id="other-predictions"></div>
+                                            
+                                            <div class="mt-4" id="disease-info">
+                                                <h5>Information:</h5>
+                                                <div id="disease-description"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Error Message -->
+                        <div id="error-message" class="alert alert-danger mt-4 d-none"></div>
+                    </div>
+                    <div class="card-footer text-center">
+                        <p class="text-muted mb-0">Disclaimer: This tool is for educational purposes only and should not replace professional medical advice.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Disease Information -->
+    <script>
+        // Information about each skin condition
+        const diseaseInfo = {
+            'akiec': {
+                name: 'Actinic Keratoses and Intraepithelial Carcinoma',
+                description: 'Actinic keratoses are precancerous lesions, while intraepithelial carcinoma (Bowen\'s disease) is an early form of skin cancer that affects the outer layer of skin.'
+            },
+            'bcc': {
+                name: 'Basal Cell Carcinoma',
+                description: 'The most common type of skin cancer. It rarely spreads to other parts of the body but can grow locally and destroy surrounding tissue.'
+            },
+            'bkl': {
+                name: 'Benign Keratosis-like Lesions',
+                description: 'A group of benign skin growths that include seborrheic keratoses, solar lentigos, and lichen planus-like keratoses.'
+            },
+            'df': {
+                name: 'Dermatofibroma',
+                description: 'A common benign skin growth (nodule) that is usually round, brownish to purple in color, and may itch or feel tender.'
+            },
+            'mel': {
+                name: 'Melanoma',
+                description: 'The most serious type of skin cancer that begins in melanocytes (cells that make melanin, which gives skin its color).'
+            },
+            'nv': {
+                name: 'Melanocytic Nevi (Moles)',
+                description: 'Benign growths made up of melanocytes. Common moles are usually harmless but should be monitored for changes.'
+            },
+            'vasc': {
+                name: 'Vascular Lesions',
+                description: 'Abnormalities of blood vessels, including hemangiomas, angiomas, and pyogenic granulomas.'
+            }
+        };
+
+        // Handle form submission
+        document.getElementById('upload-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Show loading spinner
+            document.getElementById('loading').classList.remove('d-none');
+            document.getElementById('results').classList.add('d-none');
+            document.getElementById('error-message').classList.add('d-none');
+            
+            // Get form data
+            const formData = new FormData(this);
+            
+            // Send request to server
+            fetch('/predict', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Hide loading spinner
+                document.getElementById('loading').classList.add('d-none');
+                
+                if (data.error) {
+                    // Show error message
+                    const errorMessage = document.getElementById('error-message');
+                    errorMessage.textContent = data.error;
+                    errorMessage.classList.remove('d-none');
+                } else {
+                    // Display results
+                    displayResults(data);
+                }
+            })
+            .catch(error => {
+                // Hide loading spinner
+                document.getElementById('loading').classList.add('d-none');
+                
+                // Show error message
+                const errorMessage = document.getElementById('error-message');
+                errorMessage.textContent = 'An error occurred during prediction: ' + error.message;
+                errorMessage.classList.remove('d-none');
+            });
+        });
+        
+        // Display prediction results
+        function displayResults(data) {
+            // Show results section
+            document.getElementById('results').classList.remove('d-none');
+            
+            // Set image preview
+            document.getElementById('preview-image').src = data.image_path;
+            
+            // Set primary prediction
+            const predClass = data.prediction.class;
+            const confidence = data.prediction.confidence * 100;
+            
+            document.getElementById('prediction-class').textContent = 
+                (diseaseInfo[predClass] ? diseaseInfo[predClass].name : predClass);
+            
+            const confidenceBar = document.getElementById('prediction-confidence');
+            confidenceBar.style.width = confidence + '%';
+            confidenceBar.textContent = confidence.toFixed(2) + '%';
+            
+            // Set color based on confidence
+            if (confidence > 80) {
+                confidenceBar.classList.add('bg-success');
+            } else if (confidence > 60) {
+                confidenceBar.classList.add('bg-info');
+            } else if (confidence > 40) {
+                confidenceBar.classList.add('bg-warning');
+            } else {
+                confidenceBar.classList.add('bg-danger');
+            }
+            
+            // Display other predictions
+            const otherPredictions = document.getElementById('other-predictions');
+            otherPredictions.innerHTML = '';
+            
+            data.prediction.top_3.slice(1).forEach(pred => {
+                const prob = pred.probability * 100;
+                const className = pred.class;
+                const displayName = diseaseInfo[className] ? diseaseInfo[className].name : className;
+                
+                const predHtml = `
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between">
+                            <span>${displayName}</span>
+                            <span>${prob.toFixed(2)}%</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar" role="progressbar" style="width: ${prob}%"></div>
+                        </div>
+                    </div>
+                `;
+                
+                otherPredictions.innerHTML += predHtml;
+            });
+            
+            // Set disease information
+            const diseaseDescription = document.getElementById('disease-description');
+            if (diseaseInfo[predClass]) {
+                diseaseDescription.innerHTML = `
+                    <p>${diseaseInfo[predClass].description}</p>
+                    <div class="alert alert-warning mt-2">
+                        <strong>Important:</strong> This is an AI prediction and not a medical diagnosis. 
+                        Please consult a healthcare professional for proper diagnosis and treatment.
+                    </div>
+                `;
+            } else {
+                diseaseDescription.innerHTML = '<p>No detailed information available for this class.</p>';
+            }
+        }
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 

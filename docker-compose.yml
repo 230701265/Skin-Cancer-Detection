@@ -1,0 +1,36 @@
+services:
+  skin-disease-app:
+    platform: linux/arm64
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./Dataset:/app/Dataset
+      - ./model:/app/model
+      - ./processed_data:/app/processed_data
+      - ./static/uploads:/app/static/uploads
+    environment:
+      - PYTHONUNBUFFERED=1
+      - FLASK_DEBUG=1
+      - FLASK_ENV=development
+      - FLASK_RUN_PORT=8080
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+    command: python app.py
+    restart: unless-stopped
+    container_name: skin-disease-app
+    stop_grace_period: 10s
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3" 

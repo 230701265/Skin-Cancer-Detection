@@ -1,0 +1,9 @@
+tensorflow==2.12.0
+numpy==1.23.5
+pandas==1.5.3
+scikit-learn==1.2.2
+matplotlib==3.7.1
+pillow==9.5.0
+flask==2.3.2
+joblib==1.2.0
+werkzeug==2.3.4 
